@@ -1,201 +1,362 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Hockey Pool Stat Estimator</title>
-<style>
-  body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
-  table { border-collapse: collapse; width: 100%; margin-bottom: 10px; background: white; }
-  th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
-  th { background: #eee; }
-  button { padding: 5px 10px; margin: 3px; }
-  input[type="number"], input[type="text"] { width: 70px; }
-  #controls { margin-bottom: 10px; }
-  .small-input { width: 50px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hockey Pool – Ranked Scoring + Projections</title>
+  <style>
+    :root{
+      --bg:#f5f7fb;--card:#ffffff;--muted:#e5e7eb;--text:#0f172a;--sub:#64748b;--accent:#2563eb;--danger:#dc2626;--ok:#059669;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{padding:16px;background:var(--card);border-bottom:1px solid var(--muted);position:sticky;top:0;z-index:5}
+    h1{margin:0;font-size:22px}
+    .sub{color:var(--sub);font-size:13px}
+    main{padding:16px;max-width:1200px;margin:0 auto}
+    .card{background:var(--card);border:1px solid var(--muted);border-radius:14px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:12px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    button{appearance:none;border:1px solid var(--muted);background:#fff;color:var(--text);padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+    button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    button.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+    button.danger{background:var(--danger);color:#fff;border-color:var(--danger)}
+    button.ghost{background:transparent}
+    input[type="text"],input[type="number"]{border:1px solid var(--muted);border-radius:10px;padding:6px 10px;background:#fff}
+    input[type="number"]{width:90px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--muted);padding:8px;text-align:center}
+    thead th{background:#f8fafc;font-weight:700}
+    tbody tr:hover{background:#fafbff}
+    .right{margin-left:auto}
+    .small{font-size:12px;color:var(--sub)}
+    .pill{padding:4px 8px;background:#eef2ff;border-radius:999px;font-size:12px}
+    .del{border:none;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;padding:2px 8px;border-radius:999px;font-weight:700;cursor:pointer}
+    .header-cell{display:flex;gap:6px;align-items:center;justify-content:center}
+    .nowrap{white-space:nowrap}
+    .muted{color:var(--sub)}
+    .hide{display:none}
+    .input-sm{width:62px}
+  </style>
 </head>
 <body>
+  <header>
+    <h1>Hockey Pool – Ranked Scoring</h1>
+    <div class="sub">Flexible teams & categories • Ranks convert to points (N for 1st … 1 for last). Toggle <em>Current</em> vs <em>Projected</em> (per‑game pace × season).
+    </div>
+  </header>  <main class="grid">
+    <section class="card" style="margin-bottom:12px">
+      <div class="row">
+        <button id="addTeamBtn" class="primary">+ Add Team</button>
+        <button id="addCategoryBtn" class="primary">+ Add Category</button>
+        <button id="saveBtn" class="ok">Save</button>
+        <button id="clearBtn" class="danger">Clear All</button>
+        <span class="small">Auto‑saves as you type</span>
+        <span class="right row">
+          <button id="exportBtn" class="ghost">Export JSON</button>
+          <label class="btn">Import JSON <input id="importFile" type="file" accept="application/json" class="hide"></label>
+        </span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="row">
+          <label class="small">Mode:</label>
+          <label class="small"><input type="radio" name="mode" value="current" checked> Current</label>
+          <label class="small"><input type="radio" name="mode" value="projected"> Projected</label>
+        </span>
+        <span class="row">
+          <label class="small">Games Played <input type="number" id="gamesPlayed" value="10" min="1" class="input-sm"></label>
+          <label class="small">Total Games <input type="number" id="totalGames" value="82" min="1" class="input-sm"></label>
+        </span>
+        <span class="right pill" id="metaPill">0 teams • 0 categories</span>
+      </div>
+    </section><section class="card" style="margin-bottom:12px">
+  <div class="muted" style="margin-bottom:6px">Enter raw stats per team & category. Use negative values for +/- if needed. Click a team or category name to rename.</div>
+  <table id="entryTable" aria-label="Stats Entry">
+    <thead>
+      <tr id="headerRow">
+        <th class="nowrap">Team</th>
+      </tr>
+    </thead>
+    <tbody id="entryBody"></tbody>
+  </table>
+</section>
 
-<h1>Hockey Pool Stat Estimator</h1>
+<section class="card">
+  <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+    <div class="muted">Leaderboard (sum of rotisserie points across categories)</div>
+    <div class="pill" id="modePill">Using: Current</div>
+  </div>
+  <table id="leaderTable" aria-label="Leaderboard">
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Team</th>
+        <th>Total Points</th>
+      </tr>
+    </thead>
+    <tbody id="leaderBody"></tbody>
+  </table>
+</section>
 
-<div id="seasonInfo">
-  <label>Games Played So Far: <input type="number" id="gamesPlayed" value="10" min="1" oninput="calculateAll()" class="small-input"></label>
-  &nbsp;&nbsp;
-  <label>Total Games in Season: <input type="number" id="totalGames" value="82" min="1" oninput="calculateAll()" class="small-input"></label>
-</div>
+  </main><script>
+// ================== State ==================
+const STORAGE_KEY = 'hockeyPool_ranked_v1';
+const state = {
+  teams: [],                // [{id, name}]
+  categories: [],           // [{id, name}]
+  stats: {},                // stats[teamId][catId] = number
+  mode: 'current',          // 'current' | 'projected'
+  gamesPlayed: 10,
+  totalGames: 82,
+};
 
-<div id="controls">
-  <button onclick="addCategory()">+ Add Category</button>
-  <button onclick="addPlayer()">+ Add Player</button>
-</div>
+const uid = () => Math.random().toString(36).slice(2,9);
 
-<table id="statsTable">
-  <thead>
-    <tr id="categoryRow">
-      <th>Player</th>
-    </tr>
-    <tr id="pointsRow">
-      <th>Points/Unit</th>
-    </tr>
-  </thead>
-  <tbody id="playersBody">
-  </tbody>
-</table>
+function ensureTeam(teamId){ if(!state.stats[teamId]) state.stats[teamId] = {}; }
+function setStat(teamId, catId, val){ ensureTeam(teamId); state.stats[teamId][catId] = val; }
+function getStat(teamId, catId){ return (state.stats[teamId] && typeof state.stats[teamId][catId] === 'number') ? state.stats[teamId][catId] : 0; }
 
-<h2>Results</h2>
-<table id="resultsTable" style="width: 100%; background: white; border-collapse: collapse;">
-  <thead>
-    <tr>
-      <th>Player</th>
-      <th>Current Total Points</th>
-      <th>Estimated Season Points</th>
-    </tr>
-  </thead>
-  <tbody id="resultsBody"></tbody>
-</table>
+function projectValue(value){
+  const gp = Math.max(1, Number(state.gamesPlayed)||1);
+  const tg = Math.max(gp, Number(state.totalGames)||gp);
+  return (value / gp) * tg; // pace to full season
+}
 
-<script>
-let categories = [];
-let players = [];
-
-function addCategory() {
-  const catName = prompt("Enter category name:");
-  if (!catName) return;
-  categories.push(catName);
-
-  // Add to stats table headers
-  let headerRow = document.getElementById("categoryRow");
-  let th = document.createElement("th");
-  th.textContent = catName;
-  headerRow.appendChild(th);
-
-  // Points per unit inputs
-  let pointsRow = document.getElementById("pointsRow");
-  let td = document.createElement("td");
-  let input = document.createElement("input");
-  input.type = "number";
-  input.step = "0.01";
-  input.value = 1;
-  input.oninput = calculateAll;
-  td.appendChild(input);
-  pointsRow.appendChild(td);
-
-  // Add input cells for each player in existing rows
-  document.querySelectorAll("#playersBody tr").forEach(row => {
-    let td = document.createElement("td");
-    let input = document.createElement("input");
-    input.type = "number";
-    input.step = "1";
-    input.value = 0;
-    input.oninput = calculateAll;
-    input.min = "";
-    input.max = "";
-    td.appendChild(input);
-    row.appendChild(td);
-  });
-
-  // Add total header if missing
-  if (!document.getElementById("totalHeader")) {
-    let totalTh = document.createElement("th");
-    totalTh.textContent = "Current Total";
-    totalTh.id = "totalHeader";
-    headerRow.appendChild(totalTh);
-
-    let blank = document.createElement("td");
-    pointsRow.appendChild(blank);
+// Rotisserie points: highest value gets N, next N-1... ties share average of occupied slots
+function rotisseriePoints(pairs){ // [{teamId, value}]
+  const n = pairs.length;
+  const sorted = [...pairs].sort((a,b)=> (b.value - a.value) || a.teamId.localeCompare(b.teamId));
+  const out = {}; let i=0; let pos=1;
+  while(i<n){
+    let j=i+1; while(j<n && sorted[j].value===sorted[i].value) j++;
+    const span = j-i; // tie size
+    let sum = 0; // sum of point slots this tie occupies
+    for(let k=0;k<span;k++) sum += (n - ((pos-1)+k));
+    const avg = sum/span;
+    for(let k=i;k<j;k++) out[sorted[k].teamId] = avg;
+    pos += span; i = j;
   }
+  return out; // teamId -> points
 }
 
-function addPlayer() {
-  const playerName = prompt("Enter player name:");
-  if (!playerName) return;
-  players.push(playerName);
+// ================== UI Builders ==================
+function render(){
+  // meta
+  document.getElementById('metaPill').textContent = `${state.teams.length} teams • ${state.categories.length} categories`;
+  document.getElementById('modePill').textContent = `Using: ${state.mode==='current'?'Current':'Projected'}`;
+  document.getElementById('gamesPlayed').value = state.gamesPlayed;
+  document.getElementById('totalGames').value = state.totalGames;
+  document.querySelectorAll('input[name="mode"]').forEach(r=> r.checked = (r.value===state.mode));
 
-  let row = document.createElement("tr");
-  let nameCell = document.createElement("td");
-  nameCell.textContent = playerName;
-  row.appendChild(nameCell);
+  // header
+  const headerRow = document.getElementById('headerRow');
+  headerRow.innerHTML = '';
+  const thTeam = document.createElement('th'); thTeam.textContent = 'Team'; headerRow.appendChild(thTeam);
+  for(const cat of state.categories){
+    const th = document.createElement('th');
+    th.appendChild(categoryHeaderContent(cat));
+    headerRow.appendChild(th);
+  }
+  const thDel = document.createElement('th'); thDel.textContent = 'Delete'; headerRow.appendChild(thDel);
 
-  categories.forEach(() => {
-    let td = document.createElement("td");
-    let input = document.createElement("input");
-    input.type = "number";
-    input.step = "1";
-    input.value = 0;
-    input.oninput = calculateAll;
-    input.min = "";
-    input.max = "";
-    td.appendChild(input);
-    row.appendChild(td);
-  });
+  // body rows
+  const body = document.getElementById('entryBody');
+  body.innerHTML = '';
+  for(const team of state.teams){
+    const tr = document.createElement('tr');
+    // team name (editable)
+    const tdName = document.createElement('td');
+    tdName.appendChild(teamNameContent(team));
+    tr.appendChild(tdName);
+    // stats inputs per category
+    for(const cat of state.categories){
+      const td = document.createElement('td');
+      td.appendChild(statInput(team.id, cat.id, getStat(team.id, cat.id)));
+      tr.appendChild(td);
+    }
+    // delete team
+    const tdDel = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.className = 'del'; btn.textContent = '✕';
+    btn.title = 'Delete team';
+    btn.onclick = ()=>{ deleteTeam(team.id); };
+    tdDel.appendChild(btn);
+    tr.appendChild(tdDel);
 
-  let totalCell = document.createElement("td");
-  totalCell.textContent = "0";
-  totalCell.className = "total";
-  row.appendChild(totalCell);
+    body.appendChild(tr);
+  }
 
-  document.getElementById("playersBody").appendChild(row);
+  // recalc leaderboard
+  recalcLeaderboard();
 }
 
-function calculateAll() {
-  let gamesPlayed = Number(document.getElementById("gamesPlayed").value) || 1;
-  let totalGames = Number(document.getElementById("totalGames").value) || gamesPlayed;
+function categoryHeaderContent(cat){
+  const wrap = document.createElement('div'); wrap.className = 'header-cell';
+  const span = document.createElement('span'); span.textContent = cat.name; span.style.cursor='pointer';
+  span.title = 'Click to rename';
+  span.onclick = ()=>{
+    const nu = prompt('Rename category', cat.name);
+    if(nu && nu.trim()){ cat.name = nu.trim(); persist(); render(); }
+  };
+  const del = document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='Delete category';
+  del.onclick = ()=>{ deleteCategory(cat.id); };
+  wrap.appendChild(span); wrap.appendChild(del);
+  return wrap;
+}
 
-  let pointsPerCat = Array.from(document.querySelectorAll("#pointsRow td input")).map(inp => Number(inp.value) || 0);
-  let tbody = document.getElementById("playersBody");
-  let rows = Array.from(tbody.querySelectorAll("tr"));
+function teamNameContent(team){
+  const span = document.createElement('span'); span.textContent = team.name; span.style.cursor='pointer'; span.title='Click to rename';
+  span.onclick = ()=>{
+    const nu = prompt('Rename team', team.name);
+    if(nu && nu.trim()){ team.name = nu.trim(); persist(); render(); }
+  };
+  return span;
+}
 
-  // Prepare results table body
-  let resultsBody = document.getElementById("resultsBody");
-  resultsBody.innerHTML = "";
+function statInput(teamId, catId, value){
+  const inp = document.createElement('input');
+  inp.type = 'number';
+  inp.step = 'any';
+  inp.value = value;
+  inp.oninput = ()=>{ setStat(teamId, catId, Number(inp.value)||0); autoSave(); recalcLeaderboard(); };
+  return inp;
+}
 
-  rows.forEach(row => {
-    let inputs = Array.from(row.querySelectorAll("td input"));
-    let currentTotal = 0;
-    let projectedTotal = 0;
+// ================== Data Ops ==================
+function addTeam(){
+  const name = prompt('Team name:');
+  if(!name) return;
+  const t = { id: uid(), name: name.trim()||'Team' };
+  state.teams.push(t); ensureTeam(t.id);
+  persist(); render();
+}
+function addCategory(){
+  const name = prompt('Category name (e.g., Goals, Assists, +/-):');
+  if(!name) return;
+  const c = { id: uid(), name: name.trim()||'Category' };
+  state.categories.push(c);
+  persist(); render();
+}
+function deleteTeam(teamId){
+  if(!confirm('Delete this team?')) return;
+  state.teams = state.teams.filter(t=>t.id!==teamId);
+  delete state.stats[teamId];
+  persist(); render();
+}
+function deleteCategory(catId){
+  if(!confirm('Delete this category?')) return;
+  state.categories = state.categories.filter(c=>c.id!==catId);
+  for(const t of Object.keys(state.stats)) delete state.stats[t][catId];
+  persist(); render();
+}
 
-    // Calculate current total points
-    inputs.forEach((inp, i) => {
-      currentTotal += (Number(inp.value) || 0) * (pointsPerCat[i] || 0);
+function recalcLeaderboard(){
+  const pairsByCat = {}; // catId -> [{teamId,value}]
+  for(const cat of state.categories){
+    pairsByCat[cat.id] = state.teams.map(t=>{
+      const raw = getStat(t.id, cat.id);
+      const val = (state.mode==='current') ? raw : projectValue(raw);
+      return { teamId: t.id, value: Number(val.toFixed(4)) };// stabilize ties
     });
-
-    // Calculate projected points:
-    // average stat per game * (total games) * points per unit
-    inputs.forEach((inp, i) => {
-      let avgPerGame = (Number(inp.value) || 0) / gamesPlayed;
-      let projectedStat = avgPerGame * totalGames;
-      projectedTotal += projectedStat * (pointsPerCat[i] || 0);
-    });
-
-    row.querySelector(".total").textContent = currentTotal.toFixed(2);
-    row.dataset.total = projectedTotal;
-
-    // Add to results table
-    let resRow = document.createElement("tr");
-    let playerName = row.children[0].textContent;
-
-    let nameTd = document.createElement("td");
-    nameTd.textContent = playerName;
-    resRow.appendChild(nameTd);
-
-    let currentTd = document.createElement("td");
-    currentTd.textContent = currentTotal.toFixed(2);
-    resRow.appendChild(currentTd);
-
-    let projectedTd = document.createElement("td");
-    projectedTd.textContent = projectedTotal.toFixed(2);
-    resRow.appendChild(projectedTd);
-
-    resultsBody.appendChild(resRow);
+  }
+  // category point maps
+  const catPoints = {}; // catId -> teamId -> points
+  for(const cat of state.categories){
+    catPoints[cat.id] = rotisseriePoints(pairsByCat[cat.id]);
+  }
+  // sum totals per team
+  const totals = state.teams.map(t=>{
+    let sum = 0;
+    for(const cat of state.categories){
+      const pts = (catPoints[cat.id]||{})[t.id] || 0;
+      sum += pts;
+    }
+    return { teamId: t.id, teamName: t.name, total: Number(sum.toFixed(4)) };
   });
+  totals.sort((a,b)=> b.total - a.total || a.teamName.localeCompare(b.teamName));
 
-  // Sort results descending by projected points
-  let resRows = Array.from(resultsBody.querySelectorAll("tr"));
-  resRows.sort((a, b) => parseFloat(b.children[2].textContent) - parseFloat(a.children[2].textContent));
-  resRows.forEach(r => resultsBody.appendChild(r));
+  const body = document.getElementById('leaderBody');
+  body.innerHTML='';
+  totals.forEach((row,i)=>{
+    const tr = document.createElement('tr');
+    const tdR = document.createElement('td'); tdR.textContent = i+1; tr.appendChild(tdR);
+    const tdN = document.createElement('td'); tdN.textContent = row.teamName; tr.appendChild(tdN);
+    const tdT = document.createElement('td'); tdT.textContent = row.total.toFixed(2); tr.appendChild(tdT);
+    body.appendChild(tr);
+  });
 }
 
-</script>
+// ================== Persistence ==================
+function persist(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+let saveTimer=null;
+function autoSave(){ clearTimeout(saveTimer); saveTimer=setTimeout(persist, 250); }
+function load(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(!raw) return;
+  try{
+    const data = JSON.parse(raw);
+    // Basic migration/validation
+    if(Array.isArray(data.teams)) state.teams = data.teams; else state.teams=[];
+    if(Array.isArray(data.categories)) state.categories = data.categories; else state.categories=[];
+    if(data.stats && typeof data.stats==='object') state.stats = data.stats; else state.stats={};
+    if(data.mode==='current' || data.mode==='projected') state.mode = data.mode;
+    if(Number.isFinite(data.gamesPlayed)) state.gamesPlayed = data.gamesPlayed;
+    if(Number.isFinite(data.totalGames)) state.totalGames = data.totalGames;
+  }catch(e){ console.warn('Failed to load saved data', e); }
+}
 
-</body>
+function clearAll(){
+  if(!confirm('Clear all teams, categories, and stats?')) return;
+  state.teams=[]; state.categories=[]; state.stats={};
+  persist(); render();
+}
+
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'hockey-pool.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJSON(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      if(!data) throw new Error('Invalid JSON');
+      // Minimal validation
+      state.teams = Array.isArray(data.teams)? data.teams:[];
+      state.categories = Array.isArray(data.categories)? data.categories:[];
+      state.stats = (data.stats && typeof data.stats==='object')? data.stats:{};
+      state.mode = (data.mode==='projected')? 'projected':'current';
+      state.gamesPlayed = Number.isFinite(data.gamesPlayed)? data.gamesPlayed:10;
+      state.totalGames = Number.isFinite(data.totalGames)? data.totalGames:82;
+      persist(); render();
+    }catch(e){ alert('Import failed: '+e.message); }
+  };
+  reader.readAsText(file);
+}
+
+// ================== Events ==================
+window.addEventListener('DOMContentLoaded',()=>{
+  // load saved
+  load();
+  render();
+
+  document.getElementById('addTeamBtn').onclick = addTeam;
+  document.getElementById('addCategoryBtn').onclick = addCategory;
+  document.getElementById('saveBtn').onclick = persist;
+  document.getElementById('clearBtn').onclick = clearAll;
+  document.getElementById('exportBtn').onclick = exportJSON;
+  document.getElementById('importFile').onchange = (e)=>{
+    if(e.target.files && e.target.files[0]) importJSON(e.target.files[0]);
+  };
+  document.getElementsByName('mode').forEach(r=>{
+    r.addEventListener('change', (e)=>{ state.mode = e.target.value; persist(); recalcLeaderboard(); document.getElementById('modePill').textContent = `Using: ${state.mode==='current'?'Current':'Projected'}`; });
+  });
+  document.getElementById('gamesPlayed').oninput = (e)=>{ state.gamesPlayed = Math.max(1, Number(e.target.value)||1); autoSave(); recalcLeaderboard(); };
+  document.getElementById('totalGames').oninput = (e)=>{ const gp=Math.max(1,Number(state.gamesPlayed)||1); state.totalGames = Math.max(gp, Number(e.target.value)||gp); autoSave(); recalcLeaderboard(); };
+});
+</script></body>
 </html>
